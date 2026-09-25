@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { STEPS } from "@/config/questionnaire";
 import { parseAttribution, EMPTY_ATTRIBUTION } from "./attribution";
-import { csvCell, prospectsToCsv } from "./csv";
-import { buildProspectPayload } from "./prospects";
-import { EMPTY_FORM, type FormValues, type Prospect } from "./types";
+import { csvCell, submissionsToCsv } from "./csv";
+import { buildSubmissionPayload } from "./crm";
+import { EMPTY_FORM, type FormValues, type Submission } from "./types";
 import { formatPhone, isBot, isValidEmail, normalizePhone, validateAll, validateStep } from "./validation";
 
 const complete: FormValues = {
@@ -112,13 +112,12 @@ describe("validación por paso", () => {
   });
 });
 
-describe("payload que se guarda", () => {
-  const p = buildProspectPayload("abc", complete, { ...EMPTY_ATTRIBUTION, utm_source: "qr" }, "NOW");
+describe("payload que se envía al CRM", () => {
+  const p = buildSubmissionPayload({ ...complete, website: "" }, { ...EMPTY_ATTRIBUTION, utm_source: "qr" }, "sid-123");
 
   it("normaliza contacto", () => {
     expect(p.fullName).toBe("Ana López Pérez");
     expect(p.email).toBe("ana@example.com");
-    expect(p.phone).toBe("+529991234567");
   });
 
   it("limpia respuestas condicionales que ya no aplican", () => {
@@ -126,22 +125,24 @@ describe("payload que se guarda", () => {
     expect(p.previousInvestmentLocation).toBe("");
   });
 
-  it("aplica los valores por defecto de la campaña", () => {
-    expect(p).toMatchObject({
-      source: "landing",
-      campaign: "medicos_merida",
-      assignedAgent: "Damara Traconis",
-      status: "nuevo",
-      privacyConsent: true,
-      privacyConsentAt: "NOW",
-      createdAt: "NOW",
-      updatedAt: "NOW",
-      utm_source: "qr",
-    });
+  it("incluye id de envío, versión y atribución", () => {
+    expect(p).toMatchObject({ submissionId: "sid-123", utm_source: "qr", privacyConsent: true });
+    expect(p.landingVersion).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it("no incluye el honeypot", () => {
-    expect(p).not.toHaveProperty("website");
+  it("NUNCA manda asignación, estado, labels ni campaña (los decide el servidor)", () => {
+    for (const k of ["assignee_uid", "agent_uid", "assignedAgent", "status", "labels", "campaign", "source", "createdAt", "privacyConsentAt"]) {
+      expect(p).not.toHaveProperty(k);
+    }
+  });
+});
+
+describe("teléfono formato CRM", () => {
+  it("muestra 521… como número local y arma wa.me", async () => {
+    const { formatPhone, whatsappDigits } = await import("./validation");
+    expect(formatPhone("5219992786153")).toBe("999 278 6153");
+    expect(whatsappDigits("5219992786153")).toBe("529992786153");
+    expect(formatPhone("13055551234")).toBe("+13055551234");
   });
 });
 
@@ -180,12 +181,24 @@ describe("CSV", () => {
     expect(csvCell("@SUM(A1)")).toBe("'@SUM(A1)");
   });
 
-  it("incluye encabezados legibles y respuestas con etiquetas", () => {
-    const row = { ...buildProspectPayload("abc", complete, EMPTY_ATTRIBUTION, null) } as unknown as Prospect;
-    const csv = prospectsToCsv([row]);
-    expect(csv.startsWith("﻿")).toBe(true);
+  it("incluye encabezados legibles, estado del CRM y respuestas con etiquetas", () => {
+    const row = {
+      ...buildSubmissionPayload(complete, EMPTY_ATTRIBUTION, "sid"),
+      phone: "5219991234567",
+      submittedAt: "2026-09-25T18:00:00Z",
+      privacyConsentAt: "2026-09-25T18:00:00Z",
+      status: "Listo para asesor",
+      owner_name: "Damara Traconis Corres",
+      crm_kind: "chatwoot",
+      crm_action: "created",
+    } as unknown as Submission;
+    const csv = submissionsToCsv([row]);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
     expect(csv).toContain("Presupuesto");
     expect(csv).toContain("$3 – 5 M MXN");
     expect(csv).toContain("Con mi pareja, Con mi familia");
+    expect(csv).toContain("Listo para asesor");
+    expect(csv).toContain("Damara Traconis Corres");
+    expect(csv).toContain("999 123 4567");
   });
 });
