@@ -3,26 +3,29 @@
 Landing + cuestionario de prospectos + panel `/admin` para la campaña `medicos_merida`
 (médicos/profesionales interesados en invertir en bienes raíces en Mérida).
 
-**Los prospectos entran directo al CRM de TRES65** (mismos contactos que Leads, Directorio,
-Chatwoot y María). No hay base de datos separada ni migraciones futuras.
+Las respuestas se guardan en el Firestore **existente** de TRES65 (`campaign_submissions`) a través
+del backend del CRM. Responder el cuestionario **no** crea ni modifica nada en Chatwoot, el Directorio,
+clientes ni María. Pasar a alguien al Directorio es una acción **manual** desde `/admin`.
 
 ## Arquitectura
 
 ```
 Landing (este repo, sitio estático)
-  └─ POST /landing/inversion-merida/submit ─→ backend CRM (agente-tres65, Railway)
-                                                ├─ valida (lista blanca), deduplica
-                                                ├─ contacto nuevo → lead en Chatwoot, listo-para-asesor, asignado a Damara
-                                                ├─ contacto existente → solo se agrega la nota (no se reasigna ni cambia su estado)
-                                                └─ respuestas completas → Firestore campaign_submissions (solo backend)
+  └─ POST /landing/inversion-merida/submit ─→ backend CRM (agente-tres65)
+                                                └─ valida (lista blanca) y guarda en campaign_submissions (status "nuevo")
 /admin (este repo) ─ login con cuentas de agente (Firebase tres65-perfilcliente)
-  └─ GET /portal/landing/inversion-merida/submissions ─→ estado y asesor EN VIVO del CRM,
-                                                          con las reglas de visibilidad del Directorio
+  ├─ GET  /portal/landing/inversion-merida/submissions          (Admin, Moisés, Damara)
+  ├─ POST .../<id>/estado        estado propio de la respuesta (no toca el CRM)
+  └─ POST .../<id>/directorio    "Agregar al Directorio":
+                                   busca por teléfono/correo en clients, directorio_manual y Chatwoot (solo lectura)
+                                   ├─ ya existe → se vincula sin cambiarle nada
+                                   └─ no existe → alta real del Directorio (directorio_manual) asignada a Damara
+                                                  + nota libre del Directorio con el resumen
 ```
 
 - Next.js 16 (`output: "export"`), TypeScript, Tailwind 4 — hosting estático (GitHub Pages).
 - El navegador **no** lee ni escribe Firestore. Firebase aquí es solo Auth para `/admin`.
-- Lógica del backend: `agente-tres65/landing_campaign.py` + bloque "LANDING INVERSIÓN MÉRIDA" de `main.py`
+- Backend: `agente-tres65/landing_campaign.py` + bloque "LANDING INVERSIÓN MÉRIDA" de `main.py`
   (rama `feat/landing-inversion-merida`). Ver su `CLAUDE.md`.
 
 ## Estructura
@@ -43,29 +46,29 @@ src/
 tests/e2e/                    E2E + arnés que corre el backend real con Chatwoot/Firestore falsos
 ```
 
-## Qué pasa al enviar el cuestionario
+## "Agregar al Directorio"
 
-| Situación en el CRM | Qué hace el backend |
+| Situación en TRES65 (teléfono últimos 10 dígitos o correo) | Qué hace |
 |---|---|
-| Nadie con ese teléfono (últimos 10 dígitos) ni correo | Lead nuevo en Chatwoot, label `listo-para-asesor`, asignado a Damara, nota privada con resumen |
-| Lead/conversación existente con agente | Nota privada con el resumen. **No** se reasigna ni se cambian labels |
-| Conversación existente sin agente ni etapa | Se asigna a Damara y entra como `listo-para-asesor` |
-| Cliente con portal (`clients`) | Se agrega una tarea con el resumen a su ficha. Nada más |
-| Contacto manual del Directorio | Se conserva; la respuesta queda ligada a él |
-| Chatwoot no responde | No se crea nada a ciegas: queda "Pendiente de vincular" (Admin reintenta desde `/admin`) |
+| No existe | Alta en `directorio_manual` (mismo mecanismo que "+ Agregar manual"): asignada a Damara, estado "Cliente potencial", `origin: medicos_merida`, nota libre del Directorio con el resumen |
+| Cliente con portal | Se vincula (abre su ficha). Nada cambia |
+| Contacto manual del Directorio | Se vincula. Nada cambia |
+| Lead de Chatwoot con etapa del Directorio | Se vincula (sin reasignar, sin labels, sin notas) |
+| Contacto de Chatwoot sin etapa | Se vincula como "Existe en Chatwoot"; no se crea otra entrada |
+| Chatwoot no responde | No se crea nada; se puede reintentar |
 
-Nunca crea portal ni pone `cliente-creado`. Los campos `assignee_uid`, `status`, labels, portal, roles, etc.
-se ignoran si vienen del navegador.
+Nunca crea conversación en Chatwoot, portal, `cliente-creado`, ni entra a la reasignación automática de 24 h.
+Es idempotente (doble clic no duplica).
+
+## Estados de la respuesta (solo del panel)
+
+Nuevo · Revisado · Contactado · Descartado · Agregado al Directorio (lo pone la acción). No cambian el CRM.
 
 ## Seguridad
 
-- Endpoint público con lista blanca de campos y códigos, honeypot, rate limit (Redis),
-  idempotencia (`submissionId`) y candado por teléfono.
-- `campaign_submissions` solo se escribe/lee con Admin SDK; las reglas de Firestore del CRM **no se modificaron**
-  (esa colección queda cerrada al navegador por defecto).
-- Panel: Admin y Moisés ven toda la campaña; cualquier otro agente solo los contactos que hoy son suyos
-  (mismas reglas del Directorio). Cuentas sin rol de agente no ven nada.
-- Notas del panel se guardan en el contacto real (nota privada de Chatwoot o tarea de la ficha).
+- Endpoint público con lista blanca de campos y códigos, honeypot, rate limit (Redis) e idempotencia.
+- `campaign_submissions` solo se escribe/lee con Admin SDK; las reglas de Firestore del CRM **no se modificaron**.
+- Panel y "Agregar al Directorio": solo Admin, Moisés y Damara (verificado en el backend). Otros agentes: 403.
 
 ## Desarrollo local (sin tocar producción)
 
@@ -85,8 +88,8 @@ Pruebas rápidas: `npm run lint && npm run typecheck && npm test && npm run buil
 
 ## Publicar
 
-1. **Backend primero:** revisar y desplegar la rama `feat/landing-inversion-merida` de `agente-tres65`
-   (ver checklist en el reporte de integración). Sin eso, el envío del cuestionario falla.
+1. **Backend primero:** revisar y desplegar la rama `feat/landing-inversion-merida` de `agente-tres65`.
+   Sin eso, el envío del cuestionario falla.
 2. Crear el repositorio en GitHub, Settings → Pages → Source: **GitHub Actions**.
 3. Settings → Secrets and variables → Actions → **Variables**: `NEXT_PUBLIC_CRM_API_URL`,
    `NEXT_PUBLIC_FIREBASE_*` (valores públicos de `WEBSITE/firebase-sync.js`), `NEXT_PUBLIC_CRM_WEB_URL`,
