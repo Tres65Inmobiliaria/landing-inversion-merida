@@ -1,45 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { User } from "firebase/auth";
-import { ExternalLink, Link2, Loader2, Mail, MessageCircle, Phone, X } from "lucide-react";
-import { labelFor, labelsFor } from "@/config/questionnaire";
+import { Loader2, Mail, MessageCircle, Phone, X } from "lucide-react";
+import { labelFor, labelsFor, MANUAL_SUBMISSION_STATUSES } from "@/config/questionnaire";
 import { AGENT, whatsappUrl } from "@/config/site";
-import { addCrmNote, fetchHistorial, relinkSubmission, type CrmNote } from "@/lib/crm";
+import { setSubmissionStatus } from "@/lib/crm";
 import { formatDateTime } from "@/lib/csv";
-import type { Submission } from "@/lib/types";
+import type { DirectoryLink, Submission, SubmissionStatus } from "@/lib/types";
 import { formatPhone, whatsappDigits } from "@/lib/validation";
+import { DirectoryAction } from "./DirectoryAction";
 import { StatusBadge } from "./StatusBadge";
-
-/** Portal/dashboard de agentes de TRES65 (para abrir la ficha de un cliente). */
-const CRM_WEB_URL = (process.env.NEXT_PUBLIC_CRM_WEB_URL || "https://tres65inmobiliaria.github.io/discovery-inmobiliaria").replace(/\/$/, "");
-
-const KIND_LABEL: Record<string, string> = {
-  chatwoot: "Lead en Chatwoot",
-  client: "Cliente con portal",
-  manual: "Contacto manual del Directorio",
-};
 
 export function ProspectDetail({
   prospect: p,
   user,
-  canRelink,
-  onChanged,
+  onLinked,
+  onStatus,
   onClose,
 }: {
   prospect: Submission;
   user: User;
-  canRelink: boolean;
-  onChanged: () => void;
+  onLinked: (id: string, directory: DirectoryLink) => void;
+  onStatus: (id: string, status: SubmissionStatus) => void;
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [notes, setNotes] = useState<CrmNote[] | null>(null);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState<"" | "note" | "relink">("");
+  // Borrador local del estado; sin cambios pendientes refleja el valor guardado.
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
+  const status = draftStatus ?? p.status;
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
-  const linked = p.crm_status === "linked";
-  const canWriteNote = linked && (p.crm_kind === "chatwoot" || p.crm_kind === "client");
 
   // Ref para no re-ejecutar el efecto de foco/teclado en cada render.
   const onCloseRef = useRef(onClose);
@@ -61,61 +52,24 @@ export function ProspectDetail({
     };
   }, []);
 
-  const loadNotes = useCallback(async () => {
-    if (!canWriteNote) return;
-    try {
-      const data = await fetchHistorial(await user.getIdToken(), p.submissionId);
-      setNotes(data.notes);
-    } catch (e) {
-      console.error(e);
-      setNotes([]);
-    }
-  }, [canWriteNote, user, p.submissionId]);
-
-  useEffect(() => {
-    // Historial del contacto en el CRM (fuente externa).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadNotes();
-  }, [loadNotes]);
-
-  async function saveNote() {
-    if (!note.trim()) return;
-    setBusy("note");
+  async function saveStatus() {
+    setBusy(true);
     setMsg(null);
     try {
-      await addCrmNote(await user.getIdToken(), p.submissionId, note.trim());
-      setNote("");
-      setMsg({ kind: "ok", text: "Nota guardada en el CRM." });
-      await loadNotes();
+      await setSubmissionStatus(await user.getIdToken(), p.submissionId, status);
+      onStatus(p.submissionId, status as SubmissionStatus);
+      setDraftStatus(null);
+      setMsg({ kind: "ok", text: "Estado actualizado." });
     } catch (e) {
       console.error(e);
-      setMsg({ kind: "error", text: "No se pudo guardar la nota." });
+      setMsg({ kind: "error", text: "No se pudo guardar el estado." });
     } finally {
-      setBusy("");
-    }
-  }
-
-  async function relink() {
-    setBusy("relink");
-    setMsg(null);
-    try {
-      await relinkSubmission(await user.getIdToken(), p.submissionId);
-      setMsg({ kind: "ok", text: "Vinculado al CRM." });
-      onChanged();
-    } catch (e) {
-      console.error(e);
-      setMsg({ kind: "error", text: "Todavía no se pudo vincular. Intenta más tarde." });
-    } finally {
-      setBusy("");
+      setBusy(false);
     }
   }
 
   const firstName = p.fullName.split(" ")[0];
   const waMessage = `Hola ${firstName}, soy ${AGENT.firstName} de TRES65 Inmobiliaria. Gracias por responder el cuestionario sobre oportunidades de inversión en Mérida.`;
-  const crmLink =
-    p.crm_kind === "client" && p.client_token
-      ? `${CRM_WEB_URL}/cliente-detalle.html?token=${encodeURIComponent(p.client_token)}`
-      : p.crm_url;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -134,7 +88,7 @@ export function ProspectDetail({
                 {p.fullName}
               </h2>
               <div className="mt-2">
-                <StatusBadge status={p.status} owner={p.owner_name} />
+                <StatusBadge status={p.status} />
               </div>
             </div>
             <button
@@ -171,86 +125,56 @@ export function ProspectDetail({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-7">
-          <Card title="En el CRM TRES65">
-            <Row label="Estado" value={p.status} />
-            <Row label="Asesor" value={p.owner_name || (linked ? "Sin asignar" : "—")} />
-            <Row
-              label="Vínculo"
-              value={
-                linked
-                  ? `${KIND_LABEL[p.crm_kind ?? ""] ?? "—"} · ${p.crm_action === "created" ? "contacto nuevo creado por la landing" : "ya existía (se conservó su asignación y estado)"}`
-                  : "Pendiente: el envío se guardó pero aún no se pudo ligar a un contacto"
-              }
-            />
-            {crmLink && (
-              <a
-                href={crmLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 w-fit items-center gap-2 font-semibold text-medio hover:underline"
-              >
-                <ExternalLink aria-hidden className="size-4" /> {p.crm_kind === "client" ? "Abrir ficha del cliente" : "Abrir conversación en Chatwoot"}
-              </a>
-            )}
-            {!linked && canRelink && (
+          <Card title="Seguimiento de la respuesta">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <label htmlFor="status" className="text-sm font-semibold text-suave">
+                  Estado de respuesta
+                </label>
+                <select
+                  id="status"
+                  value={status}
+                  onChange={(e) => setDraftStatus(e.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-xl border border-borde bg-white px-3 focus:border-medio focus:outline-none focus:ring-4 focus:ring-acento/20"
+                >
+                  {p.status === "agregado_directorio" && <option value="agregado_directorio">Agregado al Directorio</option>}
+                  {MANUAL_SUBMISSION_STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
-                onClick={relink}
-                disabled={busy !== ""}
-                className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full bg-profundo px-5 font-semibold text-white hover:bg-medio disabled:opacity-50"
+                onClick={saveStatus}
+                disabled={busy || status === p.status}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-profundo px-5 font-semibold text-white hover:bg-medio disabled:opacity-50"
               >
-                {busy === "relink" ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <Link2 aria-hidden className="size-4" />}
-                Reintentar vinculación
+                {busy && <Loader2 aria-hidden className="size-4 animate-spin" />} Guardar estado
               </button>
+            </div>
+            {p.status_updated_by && (
+              <p className="text-xs text-suave">
+                Último cambio: {formatDateTime(p.status_updated_at)} · {p.status_updated_by}
+              </p>
             )}
-            <p className="text-xs text-suave">
-              El estado y la asignación se cambian en el CRM (Leads / Directorio / Chatwoot), no aquí.
-            </p>
+            {msg && (
+              <p role="status" className={`text-sm ${msg.kind === "ok" ? "text-medio" : "text-error"}`}>
+                {msg.text}
+              </p>
+            )}
+            <p className="text-xs text-suave">Este estado solo organiza las respuestas de la campaña; no cambia nada en el CRM.</p>
           </Card>
 
-          {canWriteNote && (
-            <Card title="Notas del contacto">
-              <label htmlFor="note" className="text-sm font-semibold text-suave">
-                Agregar nota (se guarda en el CRM)
-              </label>
-              <textarea
-                id="note"
-                rows={3}
-                maxLength={2000}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Ej. Le llamé, prefiere que la contacten por la tarde."
-                className="mt-1 w-full rounded-xl border border-borde bg-white p-3 focus:border-medio focus:outline-none focus:ring-4 focus:ring-acento/20"
-              />
-              <button
-                onClick={saveNote}
-                disabled={busy !== "" || !note.trim()}
-                className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full border-2 border-profundo px-5 font-semibold text-profundo hover:bg-menta disabled:opacity-50"
-              >
-                {busy === "note" && <Loader2 aria-hidden className="size-4 animate-spin" />} Agregar nota
-              </button>
-              {notes === null ? (
-                <Loader2 aria-label="Cargando notas" className="size-5 animate-spin text-medio" />
-              ) : notes.length === 0 ? (
-                <p className="text-sm text-suave">Sin notas.</p>
-              ) : (
-                <ul className="grid gap-3">
-                  {[...notes].reverse().map((n, i) => (
-                    <li key={i} className="rounded-2xl bg-piedra p-3">
-                      <p className="whitespace-pre-wrap">{n.text}</p>
-                      <p className="mt-1 text-xs text-suave">
-                        {[n.author, formatDateTime(n.created_at)].filter(Boolean).join(" · ")}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          )}
-          {msg && (
-            <p role="status" className={`mb-4 text-sm ${msg.kind === "ok" ? "text-medio" : "text-error"}`}>
-              {msg.text}
-            </p>
-          )}
+          <Card title="Directorio TRES65">
+            <DirectoryAction submission={p} user={user} onLinked={onLinked} />
+            {!p.directory && (
+              <p className="text-xs text-suave">
+                Antes de crear, se busca por teléfono y correo. Si la persona ya existe en TRES65 solo se vincula, sin cambiar su
+                asesor, estado ni notas. Si no existe, se crea en el Directorio asignada a Damara.
+              </p>
+            )}
+          </Card>
 
           <Card title="Datos">
             <Row label="Nombre" value={p.fullName} />
