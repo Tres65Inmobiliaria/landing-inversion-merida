@@ -1,4 +1,4 @@
-import { labelFor, labelsFor } from "@/config/questionnaire";
+import { labelFor, labelsFor, statusLabel } from "@/config/questionnaire";
 import type { Submission } from "./types";
 import { formatPhone } from "./validation";
 
@@ -29,20 +29,21 @@ export function csvCell(value: unknown): string {
   return s;
 }
 
-const CRM_KIND: Record<string, string> = {
+const DIR_KIND: Record<string, string> = {
   chatwoot: "Lead (Chatwoot)",
   client: "Cliente con portal",
-  manual: "Directorio (manual)",
+  manual: "Directorio",
 };
-const CRM_ACTION: Record<string, string> = { created: "Contacto nuevo", enriched: "Ya existía en el CRM" };
 
 const COLUMNS: [string, (p: Submission) => unknown][] = [
   ["ID envío", (p) => p.submissionId],
   ["Fecha", (p) => formatDateTime(p.submittedAt)],
-  ["Estado en CRM", (p) => p.status],
-  ["Asesor", (p) => p.owner_name ?? ""],
-  ["Vínculo CRM", (p) => (p.crm_kind ? CRM_KIND[p.crm_kind] : "Pendiente")],
-  ["Origen del contacto", (p) => (p.crm_action ? CRM_ACTION[p.crm_action] : "")],
+  ["Estado de respuesta", (p) => statusLabel(p.status)],
+  ["Directorio", (p) => (p.directory ? "En Directorio" : "No agregado")],
+  ["Tipo de contacto en TRES65", (p) => (p.directory ? DIR_KIND[p.directory.kind] : "")],
+  ["Contacto", (p) => (p.directory ? (p.directory.state === "created" ? "Creado desde la landing" : "Ya existía") : "")],
+  ["Asesor en TRES65", (p) => p.directory?.owner_name ?? ""],
+  ["Fecha de conversión", (p) => formatDateTime(p.directory?.converted_at ?? p.directory?.linked_at)],
   ["Nombre", (p) => p.fullName],
   ["Correo", (p) => p.email],
   ["Teléfono / WhatsApp", (p) => formatPhone(p.phone)],

@@ -7,7 +7,7 @@ export interface Filters {
   eventInterest: string;
   investmentTimeline: string;
   investmentBudget: string;
-  purchaseMethod: string;
+  directory: string;
 }
 
 export const EMPTY_FILTERS: Filters = {
@@ -16,7 +16,7 @@ export const EMPTY_FILTERS: Filters = {
   eventInterest: "",
   investmentTimeline: "",
   investmentBudget: "",
-  purchaseMethod: "",
+  directory: "",
 };
 
 const normalize = (s: string) =>
@@ -33,7 +33,8 @@ export function filterProspects(rows: Submission[], f: Filters): Submission[] {
     if (f.eventInterest && p.eventInterest !== f.eventInterest) return false;
     if (f.investmentTimeline && p.investmentTimeline !== f.investmentTimeline) return false;
     if (f.investmentBudget && p.investmentBudget !== f.investmentBudget) return false;
-    if (f.purchaseMethod && p.purchaseMethod !== f.purchaseMethod) return false;
+    if (f.directory === "si" && !p.directory) return false;
+    if (f.directory === "no" && p.directory) return false;
     if (q) {
       const inText = normalize(`${p.fullName} ${p.email} ${p.preferredArea}`).includes(q);
       const inPhone = qDigits.length >= 3 && p.phone.replace(/\D/g, "").includes(qDigits);
@@ -46,11 +47,11 @@ export function filterProspects(rows: Submission[], f: Filters): Submission[] {
 export function computeKpis(rows: Submission[]) {
   return {
     total: rows.length,
-    /** Contactos que NO existían en el CRM y creó esta landing. */
-    nuevos: rows.filter((p) => p.crm_action === "created").length,
+    nuevos: rows.filter((p) => p.status === "nuevo").length,
     presentacion: rows.filter((p) => p.eventInterest === "si").length,
     proxima: rows.filter((p) => NEAR_TERM_TIMELINES.includes(p.investmentTimeline)).length,
     conPresupuesto: rows.filter((p) => p.investmentBudget && p.investmentBudget !== UNDEFINED_BUDGET).length,
+    enDirectorio: rows.filter((p) => p.directory).length,
   };
 }
 

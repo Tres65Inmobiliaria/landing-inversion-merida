@@ -1,9 +1,10 @@
-import type { Attribution, FormValues, Submission } from "./types";
+import type { Attribution, DirectoryLink, FormValues, Submission } from "./types";
 
 /**
  * Backend del CRM TRES65 (agente-tres65). La landing NO escribe en Firestore:
- * envía el cuestionario a un endpoint controlado que valida, deduplica, crea o
- * enriquece el contacto real (Chatwoot / clients / Directorio) y asigna a Damara.
+ * el cuestionario se envía a un endpoint que valida y guarda la respuesta en
+ * campaign_submissions. Pasar a alguien al Directorio es una acción manual del
+ * panel ("Agregar al Directorio"), también server-side.
  */
 export const CRM_API_URL = (process.env.NEXT_PUBLIC_CRM_API_URL || "https://agente-tres65-production.up.railway.app").replace(
   /\/$/,
@@ -96,20 +97,21 @@ export async function fetchSubmissions(token: string) {
   return call<{ submissions: Submission[]; full_view: boolean }>(BASE, { method: "GET" }, token);
 }
 
-export interface CrmNote {
-  text: string;
-  author: string;
-  created_at: string | number;
+export async function setSubmissionStatus(token: string, id: string, status: string) {
+  return call<{ status: string }>(`${BASE}/${encodeURIComponent(id)}/estado`, { method: "POST", body: JSON.stringify({ status }) }, token);
 }
 
-export async function fetchHistorial(token: string, id: string) {
-  return call<{ notes: CrmNote[] }>(`${BASE}/${encodeURIComponent(id)}/historial`, { method: "GET" }, token);
+/** "Agregar al Directorio": el backend busca duplicados y vincula o crea (nunca desde el navegador). */
+export async function addToDirectorio(token: string, id: string) {
+  return call<{ directory: DirectoryLink; already: boolean }>(`${BASE}/${encodeURIComponent(id)}/directorio`, { method: "POST" }, token);
 }
 
-export async function addCrmNote(token: string, id: string, text: string) {
-  return call(`${BASE}/${encodeURIComponent(id)}/nota`, { method: "POST", body: JSON.stringify({ text }) }, token);
-}
+/** Dashboard de agentes de TRES65 (el Directorio vive ahí). */
+export const CRM_WEB_URL = (process.env.NEXT_PUBLIC_CRM_WEB_URL || "https://tres65inmobiliaria.github.io/discovery-inmobiliaria").replace(/\/$/, "");
 
-export async function relinkSubmission(token: string, id: string) {
-  return call(`${BASE}/${encodeURIComponent(id)}/vincular`, { method: "POST" }, token);
+/** A dónde lleva "Abrir en Directorio" según qué tipo de contacto es. */
+export function directoryUrl(d: DirectoryLink): string {
+  if (d.kind === "client" && d.client_token) return `${CRM_WEB_URL}/cliente-detalle.html?token=${encodeURIComponent(d.client_token)}`;
+  if (d.kind === "chatwoot" && !d.in_directorio && d.chatwoot_url) return d.chatwoot_url;
+  return `${CRM_WEB_URL}/agente-home.html`;
 }

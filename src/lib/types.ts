@@ -71,9 +71,32 @@ export interface Attribution {
   landingUrl: string;
 }
 
+export type SubmissionStatus = "nuevo" | "revisado" | "contactado" | "descartado" | "agregado_directorio";
+
+/** Resultado de "Agregar al Directorio" (lo escribe el backend). */
+export interface DirectoryLink {
+  /** created = la landing creó el contacto; existing = ya existía y solo se vinculó. */
+  state: "created" | "existing";
+  kind: "manual" | "client" | "chatwoot";
+  /** false solo si existe en Chatwoot pero sin etapa del Directorio. */
+  in_directorio: boolean;
+  manual_id?: string;
+  client_token?: string;
+  conv_id?: string | null;
+  contact_id?: number;
+  matched_by?: "phone" | "email";
+  owner_uid?: string | null;
+  owner_name?: string | null;
+  chatwoot_url?: string;
+  converted_at?: string;
+  converted_by?: string;
+  linked_at?: string;
+  linked_by?: string;
+}
+
 /**
- * Fila del panel: una respuesta al cuestionario (campaign_submissions en el CRM)
- * + su estado y asesor ACTUALES en el CRM TRES65 (calculados por el backend).
+ * Fila del panel: una respuesta al cuestionario (campaign_submissions en el
+ * Firestore de TRES65), con su estado propio y su vínculo con el Directorio.
  */
 export interface Submission extends Attribution {
   submissionId: string;
@@ -116,14 +139,11 @@ export interface Submission extends Attribution {
   privacyConsent: boolean;
   privacyConsentAt: string;
 
-  /** Estado en el CRM (misma clasificación que el Directorio). */
-  status: string;
-  owner_uid: string | null;
-  owner_name: string | null;
-  crm_status: "linked" | "pending_review" | "error" | "processing" | null;
-  crm_kind: "chatwoot" | "client" | "manual" | null;
-  crm_action: "created" | "enriched" | null;
-  conv_id: string | null;
-  client_token: string | null;
-  crm_url?: string;
+  /** Estado PROPIO de la respuesta (no es el estado del CRM). */
+  status: SubmissionStatus;
+  status_updated_at?: string;
+  status_updated_by?: string;
+
+  /** Vínculo con el Directorio de TRES65; null hasta "Agregar al Directorio". */
+  directory: DirectoryLink | null;
 }

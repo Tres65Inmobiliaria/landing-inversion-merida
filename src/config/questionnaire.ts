@@ -99,18 +99,26 @@ export const UNDEFINED_BUDGET = "sin_definir";
 export const DECISION_ALONE = "solo";
 
 /**
- * Estados del CRM TRES65 tal como los muestra el Directorio (no hay un estado
- * paralelo de la landing). "Pendiente de vincular" = el envío se guardó pero el
- * backend aún no pudo ligarlo a un contacto (p. ej. Chatwoot no respondió).
+ * Estados PROPIOS de cada respuesta, solo para organizar el panel de esta campaña.
+ * No son ni cambian los estados del CRM. "agregado_directorio" lo pone el backend
+ * al usar "Agregar al Directorio" (no se elige a mano).
  */
-export const CRM_STATUSES: Option[] = [
-  { value: "Listo para asesor", label: "Listo para asesor" },
-  { value: "Cliente potencial", label: "Cliente potencial" },
-  { value: "Cliente creado", label: "Cliente creado" },
-  { value: "Cierre perdido", label: "Cierre perdido" },
-  { value: "Descartado", label: "Descartado" },
-  { value: "Sin etapa", label: "Sin etapa" },
-  { value: "Pendiente de vincular", label: "Pendiente de vincular" },
+export const SUBMISSION_STATUSES: Option[] = [
+  { value: "nuevo", label: "Nuevo" },
+  { value: "revisado", label: "Revisado" },
+  { value: "contactado", label: "Contactado" },
+  { value: "descartado", label: "Descartado" },
+  { value: "agregado_directorio", label: "Agregado al Directorio" },
+];
+export const MANUAL_SUBMISSION_STATUSES = SUBMISSION_STATUSES.filter((s) => s.value !== "agregado_directorio");
+
+export function statusLabel(value: string | undefined | null): string {
+  return SUBMISSION_STATUSES.find((s) => s.value === value)?.label ?? value ?? "—";
+}
+
+export const DIRECTORY_FILTER: Option[] = [
+  { value: "si", label: "En Directorio" },
+  { value: "no", label: "No agregado" },
 ];
 
 export function labelFor(key: OptionKey, value: string | undefined | null): string {
