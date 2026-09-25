@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+.firebase/
+.firebaserc
+/test-results/
+
+
+# Plantilla de variables (sí se versiona)
+!.env.example
