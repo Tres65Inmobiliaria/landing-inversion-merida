@@ -187,18 +187,41 @@ describe("CSV", () => {
       phone: "5219991234567",
       submittedAt: "2026-09-25T18:00:00Z",
       privacyConsentAt: "2026-09-25T18:00:00Z",
-      status: "Listo para asesor",
-      owner_name: "Damara Traconis Corres",
-      crm_kind: "chatwoot",
-      crm_action: "created",
+      status: "agregado_directorio",
+      directory: { state: "created", kind: "manual", in_directorio: true, owner_name: "Damara Traconis Corres", converted_at: "2026-09-25T19:00:00Z" },
     } as unknown as Submission;
     const csv = submissionsToCsv([row]);
     expect(csv.startsWith("\uFEFF")).toBe(true);
     expect(csv).toContain("Presupuesto");
     expect(csv).toContain("$3 – 5 M MXN");
     expect(csv).toContain("Con mi pareja, Con mi familia");
-    expect(csv).toContain("Listo para asesor");
+    expect(csv).toContain("Agregado al Directorio");
+    expect(csv).toContain("En Directorio");
+    expect(csv).toContain("Creado desde la landing");
     expect(csv).toContain("Damara Traconis Corres");
     expect(csv).toContain("999 123 4567");
+  });
+});
+
+describe("panel: filtros y enlaces", () => {
+  const base = { ...buildSubmissionPayload(complete, EMPTY_ATTRIBUTION, "x"), phone: "5219991234567", submittedAt: "" };
+  const rows = [
+    { ...base, submissionId: "a", status: "nuevo", directory: null },
+    { ...base, submissionId: "b", status: "agregado_directorio", eventInterest: "si", directory: { state: "existing", kind: "client", in_directorio: true, client_token: "tok" } },
+  ] as unknown as Submission[];
+
+  it("filtra por agregado / no agregado al Directorio y por estado", async () => {
+    const { filterProspects, EMPTY_FILTERS, computeKpis } = await import("./admin");
+    expect(filterProspects(rows, { ...EMPTY_FILTERS, directory: "si" }).map((r) => r.submissionId)).toEqual(["b"]);
+    expect(filterProspects(rows, { ...EMPTY_FILTERS, directory: "no" }).map((r) => r.submissionId)).toEqual(["a"]);
+    expect(filterProspects(rows, { ...EMPTY_FILTERS, status: "nuevo" }).map((r) => r.submissionId)).toEqual(["a"]);
+    expect(computeKpis(rows)).toMatchObject({ total: 2, nuevos: 1, enDirectorio: 1 });
+  });
+
+  it("'Abrir en Directorio' lleva al lugar correcto", async () => {
+    const { directoryUrl } = await import("./crm");
+    expect(directoryUrl({ state: "existing", kind: "client", in_directorio: true, client_token: "t k" })).toMatch(/cliente-detalle\.html\?token=t%20k$/);
+    expect(directoryUrl({ state: "created", kind: "manual", in_directorio: true })).toMatch(/agente-home\.html$/);
+    expect(directoryUrl({ state: "existing", kind: "chatwoot", in_directorio: false, chatwoot_url: "https://cw/x" })).toBe("https://cw/x");
   });
 });

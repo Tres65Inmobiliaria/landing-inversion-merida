@@ -49,7 +49,7 @@ state = {}
 
 def reset():
     mocker.reset_mock()
-    state["fs"] = FakeFS(clients={}, directorio_manual={}, campaign_submissions={}, lead_assigned={})
+    state["fs"] = FakeFS(clients={}, directorio_manual={}, campaign_submissions={}, directorio_tipo={}, lead_assigned={})
     state["cw"] = FakeChatwoot(mocker)
     m._fs = state["fs"]
     m._redis = fakeredis.FakeRedis(decode_responses=True)
@@ -86,9 +86,14 @@ def _e2e_reset():
 @m.app.route("/__e2e/state")
 def _e2e_state():
     cw = state["cw"]
+    calls = [r for r in mocker.request_history if r.url.startswith(m.chatwoot_base())]
     return jsonify(
+        chatwoot_calls=len(calls),
+        chatwoot_writes=len([r for r in calls if r.method != "GET"]),
         submissions=state["fs"].data.get("campaign_submissions", {}),
         clients=state["fs"].data.get("clients", {}),
+        directorio_manual=state["fs"].data.get("directorio_manual", {}),
+        directorio_tipo=state["fs"].data.get("directorio_tipo", {}),
         contacts=list(cw.contacts.values()),
         convs=list(cw.convs.values()),
         messages={str(k): v for k, v in cw.messages.items()},
