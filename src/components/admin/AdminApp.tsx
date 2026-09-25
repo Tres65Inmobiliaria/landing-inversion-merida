@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { Loader2, LogOut, ShieldAlert } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 import logo from "@/assets/logo-tres65.png";
-import { btn } from "@/components/ui";
 import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
-import { isAdmin } from "@/lib/prospects";
 import { Dashboard } from "./Dashboard";
 import { LoginForm } from "./LoginForm";
 
-type State = { kind: "loading" } | { kind: "signedOut" } | { kind: "denied"; user: User } | { kind: "admin"; user: User };
+type State = { kind: "loading" } | { kind: "signedOut" } | { kind: "signedIn"; user: User };
 
 export function AdminApp() {
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -19,11 +17,10 @@ export function AdminApp() {
 
   useEffect(() => {
     if (!configured) return;
-    return onAuthStateChanged(getFirebaseAuth(), async (user) => {
-      if (!user) return setState({ kind: "signedOut" });
-      setState({ kind: "loading" });
-      setState((await isAdmin(user.uid)) ? { kind: "admin", user } : { kind: "denied", user });
-    });
+    // Quién puede ver qué lo decide el backend del CRM (mismas reglas que el Directorio).
+    return onAuthStateChanged(getFirebaseAuth(), (user) =>
+      setState(user ? { kind: "signedIn", user } : { kind: "signedOut" }),
+    );
   }, [configured]);
 
   const logout = () => signOut(getFirebaseAuth());
@@ -38,7 +35,7 @@ export function AdminApp() {
               Prospectos · Inversión Mérida
             </span>
           </div>
-          {(state.kind === "admin" || state.kind === "denied") && (
+          {state.kind === "signedIn" && (
             <div className="flex items-center gap-3">
               <span className="hidden text-sm text-suave md:inline">{state.user.email}</span>
               <button onClick={logout} className="inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-sm font-semibold text-profundo hover:bg-menta">
@@ -52,7 +49,7 @@ export function AdminApp() {
       {!configured ? (
         <Centered>
           <p className="font-semibold text-profundo">Firebase no está configurado.</p>
-          <p className="mt-2 text-suave">Faltan las variables NEXT_PUBLIC_FIREBASE_* (ver .env.example).</p>
+          <p className="mt-2 text-suave">Faltan las variables NEXT_PUBLIC_FIREBASE_* del CRM (ver .env.example).</p>
         </Centered>
       ) : state.kind === "loading" ? (
         <Centered>
@@ -60,19 +57,8 @@ export function AdminApp() {
         </Centered>
       ) : state.kind === "signedOut" ? (
         <LoginForm />
-      ) : state.kind === "denied" ? (
-        <Centered>
-          <ShieldAlert aria-hidden className="mx-auto size-10 text-error" />
-          <p className="mt-4 font-semibold text-profundo">Esta cuenta no tiene acceso al panel.</p>
-          <p className="mt-2 text-suave">
-            Si deberías tenerlo, pide que agreguen tu usuario a la lista de administradores.
-          </p>
-          <button onClick={logout} className={`${btn.secondary} mt-6`}>
-            Cerrar sesión
-          </button>
-        </Centered>
       ) : (
-        <Dashboard user={state.user} />
+        <Dashboard user={state.user} onLogout={logout} />
       )}
     </div>
   );

@@ -1,40 +1,51 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "firebase/auth";
-import { ChevronRight, Download, Loader2, Search, X } from "lucide-react";
-import { labelFor, labelsFor, OPTIONS, STATUSES, type Option } from "@/config/questionnaire";
+import { ChevronRight, Download, Loader2, RefreshCw, Search, ShieldAlert, X } from "lucide-react";
+import { btn } from "@/components/ui";
+import { CRM_STATUSES, labelFor, labelsFor, OPTIONS, type Option } from "@/config/questionnaire";
 import { computeKpis, EMPTY_FILTERS, filterProspects, type Filters } from "@/lib/admin";
+import { CrmError, fetchSubmissions } from "@/lib/crm";
 import { downloadCsv, formatDateTime } from "@/lib/csv";
-import { subscribeProspects } from "@/lib/prospects";
-import type { Prospect } from "@/lib/types";
+import type { Submission } from "@/lib/types";
 import { formatPhone } from "@/lib/validation";
 import { ProspectDetail } from "./ProspectDetail";
 import { StatusBadge } from "./StatusBadge";
 
-export function Dashboard({ user }: { user: User }) {
-  const [rows, setRows] = useState<Prospect[] | null>(null);
+export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const [rows, setRows] = useState<Submission[] | null>(null);
+  const [fullView, setFullView] = useState(false);
   const [error, setError] = useState("");
+  const [denied, setDenied] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   // Enlace directo a una ficha: /admin/?p=<id>. (Este componente solo se monta en el navegador.)
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("p"),
   );
 
-  useEffect(
-    () =>
-      subscribeProspects(
-        (data) => {
-          setRows(data);
-          setError("");
-        },
-        (err) => {
-          console.error(err);
-          setError("No se pudieron cargar los prospectos. Recarga la página o vuelve a iniciar sesión.");
-        },
-      ),
-    [],
-  );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await fetchSubmissions(await user.getIdToken());
+      setRows(data.submissions);
+      setFullView(data.full_view);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof CrmError && (err.status === 401 || err.status === 403)) setDenied(true);
+      else setError("No se pudieron cargar los prospectos del CRM. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Carga inicial de datos externos (el backend del CRM).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
 
   function open(id: string | null) {
     setSelectedId(id);
@@ -46,17 +57,42 @@ export function Dashboard({ user }: { user: User }) {
 
   const filtered = useMemo(() => (rows ? filterProspects(rows, filters) : []), [rows, filters]);
   const kpis = useMemo(() => computeKpis(rows ?? []), [rows]);
-  const selected = rows?.find((r) => r.id === selectedId) ?? null;
+  const selected = rows?.find((r) => r.submissionId === selectedId) ?? null;
   const hasFilters = JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS);
   const set = (k: keyof Filters) => (v: string) => setFilters((f) => ({ ...f, [k]: v }));
+
+  if (denied) {
+    return (
+      <main className="mx-auto max-w-md px-5 py-24 text-center">
+        <div className="rounded-3xl border border-borde bg-white p-8">
+          <ShieldAlert aria-hidden className="mx-auto size-10 text-error" />
+          <p className="mt-4 font-semibold text-profundo">Esta cuenta no tiene acceso al panel.</p>
+          <p className="mt-2 text-suave">Usa tu cuenta de agente de TRES65.</p>
+          <button onClick={onLogout} className={`${btn.secondary} mt-6`}>
+            Cerrar sesión
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-serif text-3xl font-semibold text-profundo">Prospectos</h1>
-          <p className="text-suave">Campaña “Diversifica tu patrimonio en Mérida”</p>
+          <p className="text-suave">
+            Campaña “Diversifica tu patrimonio en Mérida” · {fullView ? "todos los asesores" : "tus contactos"}
+          </p>
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+        <button
+          onClick={load}
+          disabled={loading}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 font-semibold text-profundo transition hover:bg-menta disabled:opacity-50"
+        >
+          <RefreshCw aria-hidden className={`size-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
+        </button>
         <button
           onClick={() => downloadCsv(filtered)}
           disabled={!filtered.length}
@@ -65,12 +101,13 @@ export function Dashboard({ user }: { user: User }) {
           <Download aria-hidden className="size-4" /> Exportar CSV
           {hasFilters && rows && <span className="text-sm font-normal">({filtered.length})</span>}
         </button>
+        </div>
       </div>
 
       {/* KPIs */}
       <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         <Kpi label="Total prospectos" value={kpis.total} />
-        <Kpi label="Nuevos" value={kpis.nuevos} onClick={() => setFilters({ ...EMPTY_FILTERS, status: "nuevo" })} />
+        <Kpi label="Nuevos en el CRM" value={kpis.nuevos} />
         <Kpi label="Interesados en presentación" value={kpis.presentacion} onClick={() => setFilters({ ...EMPTY_FILTERS, eventInterest: "si" })} />
         <Kpi label="Inversión próxima (≤ 6 meses)" value={kpis.proxima} />
         <Kpi label="Con presupuesto definido" value={kpis.conPresupuesto} />
@@ -93,7 +130,7 @@ export function Dashboard({ user }: { user: User }) {
           />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
-          <Select label="Estado" value={filters.status} onChange={set("status")} options={STATUSES} />
+          <Select label="Estado en CRM" value={filters.status} onChange={set("status")} options={CRM_STATUSES} />
           <Select label="Presentación" value={filters.eventInterest} onChange={set("eventInterest")} options={OPTIONS.eventInterest} />
           <Select label="Plazo" value={filters.investmentTimeline} onChange={set("investmentTimeline")} options={OPTIONS.investmentTimeline} />
           <Select label="Presupuesto" value={filters.investmentBudget} onChange={set("investmentBudget")} options={OPTIONS.investmentBudget} />
@@ -120,7 +157,7 @@ export function Dashboard({ user }: { user: User }) {
           </div>
         ) : filtered.length === 0 ? (
           <p className="rounded-3xl border border-dashed border-borde bg-white p-10 text-center text-suave">
-            {rows?.length ? "Ningún prospecto coincide con los filtros." : "Aún no hay prospectos."}
+            {rows?.length ? "Ningún prospecto coincide con los filtros." : "Aún no hay prospectos de esta campaña para ti."}
           </p>
         ) : (
           <>
@@ -131,17 +168,17 @@ export function Dashboard({ user }: { user: User }) {
             {/* Móvil: tarjetas */}
             <ul className="grid gap-3 lg:hidden">
               {filtered.map((p) => (
-                <li key={p.id}>
+                <li key={p.submissionId}>
                   <button
-                    onClick={() => open(p.id)}
+                    onClick={() => open(p.submissionId)}
                     className="w-full rounded-2xl border border-borde bg-white p-4 text-left transition hover:border-acento"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-profundo">{p.fullName}</p>
-                        <p className="text-sm text-suave">{formatDateTime(p.createdAt)}</p>
+                        <p className="text-sm text-suave">{formatDateTime(p.submittedAt)}</p>
                       </div>
-                      <StatusBadge status={p.status} />
+                      <StatusBadge status={p.status} owner={p.owner_name} />
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                       <dt className="text-suave">Presupuesto</dt>
@@ -161,7 +198,7 @@ export function Dashboard({ user }: { user: User }) {
               <table className="w-full min-w-[1100px] text-left text-sm">
                 <thead className="bg-menta/60 text-xs tracking-wide text-profundo uppercase">
                   <tr>
-                    {["Fecha", "Nombre", "WhatsApp", "Email", "Presupuesto", "Forma de compra", "Plazo", "Objetivo", "Presentación", "Estado", ""].map((h) => (
+                    {["Fecha", "Nombre", "WhatsApp", "Email", "Presupuesto", "Forma de compra", "Plazo", "Objetivo", "Presentación", "Estado en CRM", ""].map((h) => (
                       <th key={h} scope="col" className="px-4 py-3 font-semibold">
                         {h}
                       </th>
@@ -171,16 +208,16 @@ export function Dashboard({ user }: { user: User }) {
                 <tbody className="divide-y divide-borde">
                   {filtered.map((p) => (
                     <tr
-                      key={p.id}
-                      onClick={() => open(p.id)}
+                      key={p.submissionId}
+                      onClick={() => open(p.submissionId)}
                       className="cursor-pointer align-top transition hover:bg-piedra"
                     >
-                      <td className="px-4 py-3 whitespace-nowrap text-suave">{formatDateTime(p.createdAt)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-suave">{formatDateTime(p.submittedAt)}</td>
                       <td className="px-4 py-3 font-semibold text-profundo">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            open(p.id);
+                            open(p.submissionId);
                           }}
                           className="text-left hover:underline"
                         >
@@ -195,7 +232,7 @@ export function Dashboard({ user }: { user: User }) {
                       <td className="max-w-56 px-4 py-3">{labelsFor("investmentPurposes", p.investmentPurposes)}</td>
                       <td className="px-4 py-3">{labelFor("eventInterest", p.eventInterest)}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={p.status} />
+                        <StatusBadge status={p.status} owner={p.owner_name} />
                       </td>
                       <td className="px-2 py-3">
                         <ChevronRight aria-hidden className="size-4 text-suave" />
@@ -209,7 +246,9 @@ export function Dashboard({ user }: { user: User }) {
         )}
       </section>
 
-      {selected && <ProspectDetail key={selected.id} prospect={selected} user={user} onClose={() => open(null)} />}
+      {selected && (
+        <ProspectDetail key={selected.submissionId} prospect={selected} user={user} canRelink={fullView} onChanged={load} onClose={() => open(null)} />
+      )}
     </main>
   );
 }

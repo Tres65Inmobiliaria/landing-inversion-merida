@@ -1,12 +1,12 @@
 import { labelFor, labelsFor } from "@/config/questionnaire";
-import type { Prospect } from "./types";
+import type { Submission } from "./types";
 import { formatPhone } from "./validation";
 
-type Ts = { toDate: () => Date } | null | undefined;
-
-export function formatDateTime(ts: Ts): string {
-  if (!ts) return "";
-  const d = ts.toDate();
+/** Fecha/hora en hora de Mérida. Acepta ISO (del backend) o epoch en segundos. */
+export function formatDateTime(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = typeof value === "number" ? new Date(value < 1e12 ? value * 1000 : value) : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleString("es-MX", {
     timeZone: "America/Merida",
     year: "numeric",
@@ -29,10 +29,20 @@ export function csvCell(value: unknown): string {
   return s;
 }
 
-const COLUMNS: [string, (p: Prospect) => unknown][] = [
-  ["ID", (p) => p.id],
-  ["Fecha", (p) => formatDateTime(p.createdAt)],
-  ["Estado", (p) => labelFor("status", p.status)],
+const CRM_KIND: Record<string, string> = {
+  chatwoot: "Lead (Chatwoot)",
+  client: "Cliente con portal",
+  manual: "Directorio (manual)",
+};
+const CRM_ACTION: Record<string, string> = { created: "Contacto nuevo", enriched: "Ya existía en el CRM" };
+
+const COLUMNS: [string, (p: Submission) => unknown][] = [
+  ["ID envío", (p) => p.submissionId],
+  ["Fecha", (p) => formatDateTime(p.submittedAt)],
+  ["Estado en CRM", (p) => p.status],
+  ["Asesor", (p) => p.owner_name ?? ""],
+  ["Vínculo CRM", (p) => (p.crm_kind ? CRM_KIND[p.crm_kind] : "Pendiente")],
+  ["Origen del contacto", (p) => (p.crm_action ? CRM_ACTION[p.crm_action] : "")],
   ["Nombre", (p) => p.fullName],
   ["Correo", (p) => p.email],
   ["Teléfono / WhatsApp", (p) => formatPhone(p.phone)],
@@ -57,7 +67,6 @@ const COLUMNS: [string, (p: Prospect) => unknown][] = [
   ["Interés en presentación", (p) => labelFor("eventInterest", p.eventInterest)],
   ["Consentimiento de privacidad", (p) => (p.privacyConsent ? "Sí" : "No")],
   ["Fecha de consentimiento", (p) => formatDateTime(p.privacyConsentAt)],
-  ["Asesora asignada", (p) => p.assignedAgent],
   ["Fuente", (p) => p.source],
   ["Campaña", (p) => p.campaign],
   ["utm_source", (p) => p.utm_source],
@@ -66,19 +75,18 @@ const COLUMNS: [string, (p: Prospect) => unknown][] = [
   ["utm_content", (p) => p.utm_content],
   ["utm_term", (p) => p.utm_term],
   ["Referrer", (p) => p.referrer],
-  ["Notas internas", (p) => (p.internalNotes ?? []).map((n) => `[${n.author}] ${n.text}`).join(" | ")],
-  ["Última actualización", (p) => formatDateTime(p.updatedAt)],
+  ["Versión de la landing", (p) => p.landingVersion],
 ];
 
-export function prospectsToCsv(rows: Prospect[]): string {
+export function submissionsToCsv(rows: Submission[]): string {
   const header = COLUMNS.map(([h]) => csvCell(h)).join(",");
   const body = rows.map((p) => COLUMNS.map(([, get]) => csvCell(get(p))).join(","));
   // BOM para que Excel respete acentos.
   return "﻿" + [header, ...body].join("\r\n");
 }
 
-export function downloadCsv(rows: Prospect[]): void {
-  const blob = new Blob([prospectsToCsv(rows)], { type: "text/csv;charset=utf-8" });
+export function downloadCsv(rows: Submission[]): void {
+  const blob = new Blob([submissionsToCsv(rows)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const stamp = new Date().toISOString().slice(0, 10);

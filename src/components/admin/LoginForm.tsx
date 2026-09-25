@@ -10,8 +10,8 @@ const input =
   "mt-2 block min-h-12 w-full rounded-2xl border border-borde bg-white px-4 text-base focus:border-medio focus:outline-none focus:ring-4 focus:ring-acento/20";
 
 /**
- * Solo inicio de sesión. No existe registro público: las cuentas se crean
- * desde la consola de Firebase y, además, deben estar en /admins/{uid}.
+ * Solo inicio de sesión, con las MISMAS cuentas de agente del dashboard de
+ * TRES65 (Firebase tres65-perfilcliente). No hay registro público.
  */
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -63,7 +63,7 @@ export function LoginForm() {
           <Lock aria-hidden className="size-6 text-medio" />
         </span>
         <h1 className="mt-5 font-serif text-2xl font-semibold text-profundo">Acceso administrativo</h1>
-        <p className="mt-1 text-sm text-suave">Solo para el equipo de TRES65.</p>
+        <p className="mt-1 text-sm text-suave">Entra con tu cuenta de agente de TRES65.</p>
 
         <label htmlFor="admin-email" className="mt-6 block font-semibold text-profundo">
           Correo

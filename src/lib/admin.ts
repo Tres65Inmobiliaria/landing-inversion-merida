@@ -1,5 +1,5 @@
 import { NEAR_TERM_TIMELINES, UNDEFINED_BUDGET } from "@/config/questionnaire";
-import type { Prospect } from "./types";
+import type { Submission } from "./types";
 
 export interface Filters {
   search: string;
@@ -23,9 +23,9 @@ const normalize = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+    .replace(/[\u0300-\u036f]/g, "");
 
-export function filterProspects(rows: Prospect[], f: Filters): Prospect[] {
+export function filterProspects(rows: Submission[], f: Filters): Submission[] {
   const q = normalize(f.search.trim());
   const qDigits = f.search.replace(/\D/g, "");
   return rows.filter((p) => {
@@ -43,17 +43,14 @@ export function filterProspects(rows: Prospect[], f: Filters): Prospect[] {
   });
 }
 
-export function computeKpis(rows: Prospect[]) {
+export function computeKpis(rows: Submission[]) {
   return {
     total: rows.length,
-    nuevos: rows.filter((p) => p.status === "nuevo").length,
+    /** Contactos que NO existían en el CRM y creó esta landing. */
+    nuevos: rows.filter((p) => p.crm_action === "created").length,
     presentacion: rows.filter((p) => p.eventInterest === "si").length,
     proxima: rows.filter((p) => NEAR_TERM_TIMELINES.includes(p.investmentTimeline)).length,
     conPresupuesto: rows.filter((p) => p.investmentBudget && p.investmentBudget !== UNDEFINED_BUDGET).length,
   };
 }
 
-/** Número para wa.me (solo dígitos). */
-export function waDigits(phone: string): string {
-  return phone.replace(/\D/g, "");
-}
