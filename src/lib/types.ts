@@ -1,5 +1,3 @@
-import type { Timestamp } from "firebase/firestore";
-
 /** Estado del formulario en el navegador. */
 export interface FormValues {
   fullName: string;
@@ -73,26 +71,22 @@ export interface Attribution {
   landingUrl: string;
 }
 
-export interface InternalNote {
-  text: string;
-  author: string;
-  createdAt: Timestamp;
-}
-
 /**
- * Documento en Firestore: `prospects/{id}`.
- * Estructura plana y con códigos estables para poder conectarlo más adelante
- * al Directorio/CRM de TRES65 sin transformaciones complicadas.
+ * Fila del panel: una respuesta al cuestionario (campaign_submissions en el CRM)
+ * + su estado y asesor ACTUALES en el CRM TRES65 (calculados por el backend).
  */
-export interface Prospect extends Attribution {
-  id: string;
-  schemaVersion: number;
-  createdAt: Timestamp | null;
-  updatedAt: Timestamp | null;
+export interface Submission extends Attribution {
+  submissionId: string;
+  campaign: string;
+  source: string;
+  landingVersion: string;
+  submittedAt: string;
 
   fullName: string;
   email: string;
+  /** Formato canónico del CRM: dígitos, México como 521XXXXXXXXXX. */
   phone: string;
+  phone_key: string;
 
   diversificationInterest: string;
   previousRealEstateInvestment: string;
@@ -120,14 +114,16 @@ export interface Prospect extends Attribution {
   eventInterest: string;
 
   privacyConsent: boolean;
-  privacyConsentAt: Timestamp | null;
+  privacyConsentAt: string;
 
-  source: string;
-  campaign: string;
-  assignedAgent: string;
+  /** Estado en el CRM (misma clasificación que el Directorio). */
   status: string;
-
-  internalNotes?: InternalNote[];
-  statusUpdatedAt?: Timestamp | null;
-  statusUpdatedBy?: string;
+  owner_uid: string | null;
+  owner_name: string | null;
+  crm_status: "linked" | "pending_review" | "error" | "processing" | null;
+  crm_kind: "chatwoot" | "client" | "manual" | null;
+  crm_action: "created" | "enriched" | null;
+  conv_id: string | null;
+  client_token: string | null;
+  crm_url?: string;
 }

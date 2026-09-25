@@ -46,10 +46,23 @@ export function normalizePhone(raw: string): string | null {
   return null;
 }
 
-/** "+529992786153" -> "999 278 6153" (MX) o el número tal cual para otros países. */
-export function formatPhone(e164: string): string {
-  const m = /^\+52(\d{3})(\d{3})(\d{4})$/.exec(e164);
-  return m ? `${m[1]} ${m[2]} ${m[3]}` : e164;
+/**
+ * Teléfono legible. Acepta el formato del CRM ("5219992786153"), E.164
+ * ("+529992786153") o 10 dígitos. México -> "999 278 6153"; otros -> "+<dígitos>".
+ */
+export function formatPhone(phone: string): string {
+  const d = (phone || "").replace(/\D/g, "");
+  const m = /^(?:521|52)?(\d{3})(\d{3})(\d{4})$/.exec(d);
+  if (m && (d.length === 10 || d.startsWith("52"))) return `${m[1]} ${m[2]} ${m[3]}`;
+  return d ? `+${d}` : "";
+}
+
+/** Dígitos para wa.me: México siempre como 52 + 10 dígitos. */
+export function whatsappDigits(phone: string): string {
+  const d = (phone || "").replace(/\D/g, "");
+  if (d.length === 13 && d.startsWith("521")) return `52${d.slice(3)}`;
+  if (d.length === 10) return `52${d}`;
+  return d;
 }
 
 function isOption(key: keyof typeof OPTIONS, value: string): boolean {

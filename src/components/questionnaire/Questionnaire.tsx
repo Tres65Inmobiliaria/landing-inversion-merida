@@ -7,8 +7,7 @@ import { btn } from "@/components/ui";
 import { DECISION_ALONE, OPTIONS, STEPS } from "@/config/questionnaire";
 import { AGENT, GENERIC_WHATSAPP_MESSAGE, whatsappUrl } from "@/config/site";
 import { captureAttribution, EMPTY_ATTRIBUTION } from "@/lib/attribution";
-import { isFirebaseConfigured } from "@/lib/firebase";
-import { submitProspect } from "@/lib/prospects";
+import { CrmError, newSubmissionId, submitToCrm } from "@/lib/crm";
 import { EMPTY_FORM, type Attribution, type FormValues } from "@/lib/types";
 import { isBot, LIMITS, validateStep, type FieldErrors } from "@/lib/validation";
 import { Checkbox, ChoiceGroup, MultiChoice, TextField } from "./fields";
@@ -28,11 +27,14 @@ export function Questionnaire() {
   const [stepIndex, setStepIndex] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<Status>("idle");
+  const [errorKind, setErrorKind] = useState<"network" | "rate" | "invalid">("network");
   const [done, setDone] = useState<{ name: string; eventInterest: string } | null>(null);
   const attribution = useRef<Attribution>(EMPTY_ATTRIBUTION);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const hasNavigated = useRef(false);
+  // Un id por llenado del formulario: si el envío se reintenta, el CRM no lo duplica.
+  const submissionId = useRef<string>("");
   const hydrated = useHydrated();
 
   const step = STEPS[stepIndex];
@@ -88,11 +90,13 @@ export function Questionnaire() {
     setStatus("submitting");
     try {
       // Honeypot: un bot llenó el campo invisible. Fingimos éxito sin guardar.
-      if (!isBot(values)) await submitProspect(values, attribution.current);
+      if (!submissionId.current) submissionId.current = newSubmissionId();
+      if (!isBot(values)) await submitToCrm(values, attribution.current, submissionId.current);
       setDone({ name: values.fullName.trim().replace(/\s+/g, " "), eventInterest: values.eventInterest });
       setStatus("done");
     } catch (err) {
       console.error("No se pudo guardar el cuestionario", err);
+      setErrorKind(err instanceof CrmError ? (err.status === 429 ? "rate" : err.status === 400 ? "invalid" : "network") : "network");
       setStatus("error");
     }
   }
@@ -110,8 +114,6 @@ export function Questionnaire() {
       </div>
     );
   }
-
-  const configured = isFirebaseConfigured();
 
   return (
     <div
@@ -427,7 +429,12 @@ export function Questionnaire() {
           <div role="alert" className="mt-6 rounded-2xl border border-error/30 bg-error/5 p-4 text-sm text-texto">
             <p className="font-semibold text-error">No pudimos enviar tus respuestas.</p>
             <p className="mt-1">
-              Revisa tu conexión e inténtalo de nuevo. Si el problema continúa, escríbele directamente a{" "}
+              {errorKind === "rate"
+                ? "Recibimos varios envíos seguidos desde este número o conexión. "
+                : errorKind === "invalid"
+                  ? "Algún dato no pudo validarse. Revisa tus respuestas. "
+                  : "Revisa tu conexión e inténtalo de nuevo. "}
+              Si el problema continúa, escríbele directamente a{" "}
               <a
                 className="font-semibold text-medio underline"
                 href={whatsappUrl(AGENT.whatsapp, GENERIC_WHATSAPP_MESSAGE)}
@@ -439,11 +446,6 @@ export function Questionnaire() {
               .
             </p>
           </div>
-        )}
-        {!configured && isLast && process.env.NODE_ENV !== "production" && (
-          <p role="status" className="mt-6 rounded-2xl bg-arena p-4 text-sm">
-            Desarrollo: Firebase no está configurado (.env.local), así que el envío fallará.
-          </p>
         )}
 
         <div className="mt-9 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">

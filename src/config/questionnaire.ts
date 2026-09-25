@@ -1,8 +1,8 @@
 /**
- * Opciones del cuestionario. Los `value` se guardan en Firestore (códigos
- * estables para una futura integración con el CRM); los `label` son lo que ve
- * el prospecto y el panel admin. Para cambiar rangos o textos basta con editar
- * este archivo: las reglas de Firestore validan tipo y longitud, no la lista.
+ * Opciones del cuestionario. Los `value` son códigos estables que el backend del
+ * CRM valida con una lista blanca (agente-tres65/landing_campaign.py → OPTIONS):
+ * si agregas o cambias un `value` aquí, cámbialo también allá o el envío se
+ * rechazará. Los `label` (lo que ve el prospecto) se pueden cambiar libremente.
  */
 export type Option = { value: string; label: string };
 
@@ -98,19 +98,24 @@ export const UNDEFINED_BUDGET = "sin_definir";
 /** Opción excluyente en "¿Quién toma la decisión?". */
 export const DECISION_ALONE = "solo";
 
-export const STATUSES: Option[] = [
-  { value: "nuevo", label: "Nuevo" },
-  { value: "contactado", label: "Contactado" },
-  { value: "seguimiento", label: "Seguimiento" },
-  { value: "cita_agendada", label: "Cita agendada" },
-  { value: "interesado", label: "Interesado" },
-  { value: "no_interesado", label: "No interesado" },
-  { value: "cerrado", label: "Cerrado" },
+/**
+ * Estados del CRM TRES65 tal como los muestra el Directorio (no hay un estado
+ * paralelo de la landing). "Pendiente de vincular" = el envío se guardó pero el
+ * backend aún no pudo ligarlo a un contacto (p. ej. Chatwoot no respondió).
+ */
+export const CRM_STATUSES: Option[] = [
+  { value: "Listo para asesor", label: "Listo para asesor" },
+  { value: "Cliente potencial", label: "Cliente potencial" },
+  { value: "Cliente creado", label: "Cliente creado" },
+  { value: "Cierre perdido", label: "Cierre perdido" },
+  { value: "Descartado", label: "Descartado" },
+  { value: "Sin etapa", label: "Sin etapa" },
+  { value: "Pendiente de vincular", label: "Pendiente de vincular" },
 ];
 
-export function labelFor(key: OptionKey | "status", value: string | undefined | null): string {
+export function labelFor(key: OptionKey, value: string | undefined | null): string {
   if (!value) return "—";
-  const list: Option[] = key === "status" ? STATUSES : OPTIONS[key];
+  const list: Option[] = OPTIONS[key];
   return list.find((o) => o.value === value)?.label ?? value;
 }
 

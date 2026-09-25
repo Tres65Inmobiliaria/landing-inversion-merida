@@ -21,18 +21,6 @@ export const AGENT = {
   email: "damara@tres65inmobiliaria.com",
 } as const;
 
-/** Valores que se guardan en cada prospecto de esta landing. */
-export const CAMPAIGN_DEFAULTS = {
-  source: "landing",
-  campaign: "medicos_merida",
-  assignedAgent: AGENT.name,
-  status: "nuevo",
-} as const;
-
-/** Nombre de la colección en Firestore (proyecto Firebase exclusivo de esta landing). */
-export const PROSPECTS_COLLECTION = "prospects";
-export const ADMINS_COLLECTION = "admins";
-
 export function whatsappUrl(phoneDigits: string, message?: string): string {
   const base = `https://wa.me/${phoneDigits}`;
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
