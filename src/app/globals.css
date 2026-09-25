@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
+/* Paleta TRES65 (misma que WEBSITE/ del portal) + tonos cálidos de piedra. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --profundo: #1a4f5c;
+  --medio: #1e7a6e;
+  --acento: #2aa898;
+  --menta: #e8f4f1;
+  --texto: #22383b;
+  --texto-suave: #52686a;
+  --borde: #d9e4e1;
+  --piedra: #f6f3ee;
+  --arena: #e9e2d6;
+  --blanco: #ffffff;
+  --error: #b42318;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-profundo: var(--profundo);
+  --color-medio: var(--medio);
+  --color-acento: var(--acento);
+  --color-menta: var(--menta);
+  --color-texto: var(--texto);
+  --color-suave: var(--texto-suave);
+  --color-borde: var(--borde);
+  --color-piedra: var(--piedra);
+  --color-arena: var(--arena);
+  --color-error: var(--error);
+  --font-sans: var(--font-raleway), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--blanco);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visible y consistente para teclado. */
+:focus-visible {
+  outline: 3px solid var(--acento);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Silueta de casa del logo TRES65 para la foto principal. */
+.house-mask {
+  clip-path: polygon(50% 0, 100% 22%, 100% 100%, 0 100%, 0 22%);
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--medio);
+}
+
+/* Evita el zoom automático de iOS en inputs (< 16px). */
+input,
+select,
+textarea {
+  font-size: 1rem;
 }
