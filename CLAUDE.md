@@ -2,13 +2,14 @@
 
 # Landing TRES65 — Inversión Mérida
 
-Ver README.md para arquitectura, seguridad y configuración. Reglas del proyecto:
+Ver README.md. Reglas del proyecto:
 
-- Proyecto aislado. No importar ni tocar nada de `../WEBSITE`, `../agente-tres65` ni producción de TRES65.
-- Toda protección de datos vive en `firestore.rules`. Si agregas un campo al prospecto, actualiza
-  `prospectKeys()` en las reglas, `buildProspectPayload`, el tipo `Prospect`, la ficha admin, el CSV
-  y corre `npm run test:rules`.
-- Opciones/labels del cuestionario solo en `src/config/questionnaire.ts` (en Firestore se guardan códigos).
+- Los prospectos entran al CRM de TRES65 SOLO por el backend (`POST /landing/inversion-merida/submit` en
+  agente-tres65). Nunca escribir en Firestore del CRM desde el navegador ni abrir reglas de Firestore.
+- No tocar `../WEBSITE`, María ni producción desde aquí. Cambios de backend van en la worktree
+  `../_feat-landing-merida` (rama `feat/landing-inversion-merida`) y no se despliegan sin aprobación.
+- Códigos de opción: `src/config/questionnaire.ts` y `agente-tres65/landing_campaign.py` deben coincidir
+  (`src/lib/backend-sync.test.ts`).
+- Estado/asignación del prospecto = los del CRM (Directorio). No crear estados paralelos en la landing.
 - Nunca emojis en la UI; iconos de `lucide-react`.
-- Emuladores: Firestore en el puerto 8181 (el 8080 está ocupado en esta máquina). Next dev bloquea
-  `127.0.0.1` como origen: usar `localhost:3065`.
+- Next dev bloquea `127.0.0.1` como origen: usar `localhost:3065`.
