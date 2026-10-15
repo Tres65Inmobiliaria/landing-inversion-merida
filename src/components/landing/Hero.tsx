@@ -36,7 +36,7 @@ export function Hero() {
           <div className="house-mask relative aspect-[4/5] overflow-hidden bg-arena">
             <Image
               src={hero}
-              alt="Fachada contemporánea con celosía y piedra, en Mérida"
+              alt="Fachada de una casa contemporánea de dos niveles en Mérida"
               fill
               priority
               sizes="(min-width: 768px) 40vw, 90vw"
