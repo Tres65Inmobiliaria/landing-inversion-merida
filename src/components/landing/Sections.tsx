@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Sprout,
 } from "lucide-react";
-import ampi from "@/assets/ampi-merida.png";
 import fachada from "@/assets/fachada-merida.jpg";
 import { container } from "@/components/ui";
 import { AGENT, SITE } from "@/config/site";
@@ -50,8 +49,8 @@ export function About() {
             </div>
           </div>
           <blockquote className="mt-5 font-serif text-lg leading-relaxed text-texto">
-            “Antes de compartirte detalles de cualquier propiedad, me gustaría conocer tu perspectiva y ver si esto
-            resuena con tus objetivos actuales.”
+            “Una buena inversión inmobiliaria comienza con información, conocimiento del mercado y las oportunidades
+            correctas. Estoy aquí para ayudarte a tomar esa decisión.”
           </blockquote>
           <figcaption className="mt-4 text-sm text-suave">Serás atendido/a directamente por Damara.</figcaption>
         </figure>
@@ -165,12 +164,11 @@ export function WhyTres65() {
           ))}
         </ul>
 
-        <div className="mt-10 flex flex-col items-start gap-6 rounded-3xl bg-white p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-          <p className="max-w-2xl font-serif text-xl leading-snug text-profundo sm:text-2xl">
+        <div className="mt-10 flex justify-center rounded-3xl bg-white p-6 sm:p-8">
+          <p className="mx-auto max-w-3xl text-center font-serif text-xl leading-snug text-profundo sm:text-2xl">
             “Nuestro compromiso no es solo cerrar una operación, sino asegurarnos de que la decisión que tomes sea la
             correcta para ti.”
           </p>
-          <Image src={ampi} alt="AMPI Mérida" className="h-10 w-auto shrink-0 sm:h-12" />
         </div>
       </div>
     </section>
