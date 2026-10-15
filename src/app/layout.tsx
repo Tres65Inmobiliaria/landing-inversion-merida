@@ -24,6 +24,20 @@ export const metadata: Metadata = {
       "Oportunidades inmobiliarias en Mérida seleccionadas según tus objetivos. TRES65 Inmobiliaria, más de 9 años en Mérida.",
     locale: "es_MX",
     type: "website",
+    images: [
+      {
+        url: "https://tres65inmobiliaria.github.io/landing-inversion-merida/thumbnail-landing-inversion.png",
+        width: 400,
+        height: 200,
+        alt: "Damara Traconis, asesora de TRES65 Inmobiliaria en Mérida",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [
+      "https://tres65inmobiliaria.github.io/landing-inversion-merida/thumbnail-landing-inversion.png",
+    ],
   },
 };
 
