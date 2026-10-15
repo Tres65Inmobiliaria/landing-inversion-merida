@@ -86,7 +86,7 @@ export function WhyMerida() {
           <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-medio md:aspect-[4/5]">
             <Image
               src={fachada}
-              alt="Casa contemporánea con muro de piedra en Mérida"
+              alt="Collage con el centro de Mérida, la costa de Progreso y una propiedad con alberca"
               fill
               sizes="(min-width: 768px) 40vw, 90vw"
               className="object-cover object-[50%_60%]"
