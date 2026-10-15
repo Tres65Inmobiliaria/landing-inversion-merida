@@ -17,26 +17,26 @@ const raleway = Raleway({
 export const metadata: Metadata = {
   title: "Diversifica tu patrimonio en Mérida | TRES65 Inmobiliaria",
   description:
-    "Conoce oportunidades inmobiliarias en Mérida seleccionadas de acuerdo con tus objetivos, horizonte de inversión y perfil. Asesoría personalizada de TRES65 Inmobiliaria.",
+    "Especialistas en propiedades de Mérida, Yucatán. Más de 9 años en el mercado inmobiliario.",
   openGraph: {
     title: "Diversifica tu patrimonio en Mérida",
-    description:
-      "Oportunidades inmobiliarias en Mérida seleccionadas según tus objetivos. TRES65 Inmobiliaria, más de 9 años en Mérida.",
+    description: "Especialistas en propiedades de Mérida, Yucatán. Más de 9 años en el mercado inmobiliario.",
     locale: "es_MX",
     type: "website",
     images: [
       {
-        url: "https://tres65inmobiliaria.github.io/landing-inversion-merida/thumbnail-landing-inversion.png",
-        width: 400,
-        height: 200,
+        url: "https://tres65inmobiliaria.github.io/landing-inversion-merida/thumbnail-damara-traconis-1200x630.png",
+        width: 1200,
+        height: 630,
         alt: "Damara Traconis, asesora de TRES65 Inmobiliaria en Mérida",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
+    description: "Especialistas en propiedades de Mérida, Yucatán. Más de 9 años en el mercado inmobiliario.",
     images: [
-      "https://tres65inmobiliaria.github.io/landing-inversion-merida/thumbnail-landing-inversion.png",
+      "https://tres65inmobiliaria.github.io/landing-inversion-merida/thumbnail-damara-traconis-1200x630.png",
     ],
   },
 };
