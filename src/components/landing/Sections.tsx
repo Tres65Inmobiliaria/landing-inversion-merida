@@ -83,7 +83,7 @@ export function WhyMerida() {
     <section id="merida" className="bg-profundo py-16 text-white sm:py-24">
       <div className={`${container} grid gap-12 md:grid-cols-[0.9fr_1.1fr] md:items-center md:gap-16`}>
         <div className="relative order-last md:order-first">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-medio md:aspect-[4/5]">
+          <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-medio">
             <Image
               src={fachada}
               alt="Collage con el centro de Mérida, la costa de Progreso y una propiedad con alberca"
